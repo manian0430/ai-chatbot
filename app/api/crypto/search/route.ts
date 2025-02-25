@@ -13,129 +13,86 @@ interface CryptoData {
   lastUpdated: string;
 }
 
-// Function to generate historical price data
-function generateHistoricalPrices(basePrice: number, days = 30) {
-  const prices = [];
-  const volatility = 0.05;
-  
-  let currentPrice = basePrice;
-  
-  for (let i = days; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    
-    // Add some random price movement
-    const change = (Math.random() - 0.5) * 2 * volatility * currentPrice;
-    currentPrice = Math.max(0.01, currentPrice + change);
-    
-    prices.push({
-      date: date.toISOString().split('T')[0],
-      price: +currentPrice.toFixed(2)
-    });
-  }
-  
-  return prices;
-}
-
-// Cryptocurrency information database
-const cryptoDatabase: Record<string, CryptoData> = {
-  bitcoin: {
-    tokenName: 'Bitcoin',
-    tokenSymbol: 'BTC',
-    currentPrice: 57000 + Math.random() * 2000,
-    priceChange24h: 2.5 + (Math.random() * 2 - 1),
-    marketCap: 1100000000000,
-    volume24h: 32000000000,
-    description: 'Bitcoin is the first decentralized cryptocurrency, based on blockchain technology that enables peer-to-peer transactions without the need for intermediaries.',
-    historicalPrices: [],
-    lastUpdated: new Date().toISOString()
-  },
-  ethereum: {
-    tokenName: 'Ethereum',
-    tokenSymbol: 'ETH',
-    currentPrice: 3200 + Math.random() * 100,
-    priceChange24h: 1.8 + (Math.random() * 2 - 1),
-    marketCap: 380000000000,
-    volume24h: 15000000000,
-    description: 'Ethereum is a decentralized, open-source blockchain featuring smart contract functionality. It enables developers to build and deploy decentralized applications (dApps).',
-    historicalPrices: [],
-    lastUpdated: new Date().toISOString()
-  },
-  solana: {
-    tokenName: 'Solana',
-    tokenSymbol: 'SOL',
-    currentPrice: 145 + Math.random() * 15,
-    priceChange24h: 3.2 + (Math.random() * 3 - 1.5),
-    marketCap: 63000000000,
-    volume24h: 2000000000,
-    description: 'Solana is a high-performance blockchain supporting builders around the world creating crypto apps that scale.',
-    historicalPrices: [],
-    lastUpdated: new Date().toISOString()
-  },
-  cardano: {
-    tokenName: 'Cardano',
-    tokenSymbol: 'ADA',
-    currentPrice: 0.5 + Math.random() * 0.05,
-    priceChange24h: 1.1 + (Math.random() * 2 - 1),
-    marketCap: 18000000000,
-    volume24h: 500000000,
-    description: 'Cardano is a proof-of-stake blockchain platform with a focus on sustainability, scalability, and transparency.',
-    historicalPrices: [],
-    lastUpdated: new Date().toISOString()
-  },
-  dogecoin: {
-    tokenName: 'Dogecoin',
-    tokenSymbol: 'DOGE',
-    currentPrice: 0.12 + Math.random() * 0.02,
-    priceChange24h: 0.8 + (Math.random() * 4 - 2),
-    marketCap: 16000000000,
-    volume24h: 800000000,
-    description: 'Dogecoin is a cryptocurrency created by software engineers as a "joke," making fun of the wild speculation in cryptocurrencies at the time.',
-    historicalPrices: [],
-    lastUpdated: new Date().toISOString()
-  }
-};
-
-// Generate historical prices for all cryptocurrencies
-Object.keys(cryptoDatabase).forEach(key => {
-  cryptoDatabase[key].historicalPrices = generateHistoricalPrices(cryptoDatabase[key].currentPrice);
-});
-
 export async function GET(request: Request) {
   try {
     // Parse the URL and get the query parameter
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query')?.toLowerCase() || '';
     
-    // Find the matching cryptocurrency by name or symbol
-    const matchedCrypto = Object.values(cryptoDatabase).find(crypto => 
-      crypto.tokenName.toLowerCase().includes(query) || 
-      crypto.tokenSymbol.toLowerCase() === query
+    // First search for the coin ID using CoinGecko's search endpoint
+    const searchResponse = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`);
+    if (!searchResponse.ok) {
+      throw new Error(`CoinGecko API error: ${searchResponse.status}`);
+    }
+    
+    const searchData = await searchResponse.json();
+    
+    // Check if any coins were found
+    if (!searchData.coins || searchData.coins.length === 0) {
+      return NextResponse.json(
+        { error: `No cryptocurrency found matching "${query}"` },
+        { status: 404 }
+      );
+    }
+    
+    // Use the first result (most relevant)
+    const coinId = searchData.coins[0].id;
+    const coinSymbol = searchData.coins[0].symbol.toUpperCase();
+    const coinName = searchData.coins[0].name;
+    
+    // Get current price data
+    const priceResponse = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`
     );
     
-    if (matchedCrypto) {
-      // Add some randomness to price each time
-      const cryptoInfo = {
-        ...matchedCrypto,
-        currentPrice: +(matchedCrypto.currentPrice + (Math.random() * (matchedCrypto.currentPrice * 0.02) - matchedCrypto.currentPrice * 0.01)).toFixed(2),
-        priceChange24h: +(matchedCrypto.priceChange24h + (Math.random() - 0.5)).toFixed(2),
-        lastUpdated: new Date().toISOString()
-      };
-      
-      console.log(`Crypto search API returning data for: ${cryptoInfo.tokenName}`);
-      return NextResponse.json(cryptoInfo);
-    } else {
-      // Default to Bitcoin if no match found
-      console.log(`No match found for "${query}", returning Bitcoin data instead`);
-      return NextResponse.json({
-        ...cryptoDatabase.bitcoin,
-        lastUpdated: new Date().toISOString()
-      });
+    if (!priceResponse.ok) {
+      throw new Error(`CoinGecko API error: ${priceResponse.status}`);
     }
+    
+    const priceData = await priceResponse.json();
+    
+    // Get historical data (last 30 days)
+    const historyResponse = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=30&interval=daily`
+    );
+    
+    if (!historyResponse.ok) {
+      throw new Error(`CoinGecko API error: ${historyResponse.status}`);
+    }
+    
+    const historyData = await historyResponse.json();
+    
+    // Format the historical prices
+    const historicalPrices = historyData.prices.map((item: [number, number]) => {
+      const date = new Date(item[0]);
+      return {
+        date: date.toISOString().split('T')[0],
+        price: item[1]
+      };
+    });
+    
+    // Construct the response with real data
+    const cryptoInfo: CryptoData = {
+      tokenName: coinName,
+      tokenSymbol: coinSymbol,
+      currentPrice: priceData.market_data.current_price.usd,
+      priceChange24h: priceData.market_data.price_change_percentage_24h || 0,
+      marketCap: priceData.market_data.market_cap.usd || 0,
+      volume24h: priceData.market_data.total_volume.usd || 0,
+      description: priceData.description.en?.split('. ').slice(0, 3).join('. ') + '.' || '',
+      historicalPrices,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    console.log(`Crypto search API returning real data for: ${cryptoInfo.tokenName}`);
+    return NextResponse.json(cryptoInfo);
   } catch (error) {
     console.error('Error in crypto search API:', error);
+    
+    // Fall back to mock data for Bitcoin if the API call fails
+    // This is temporary for resilience until the API integration is fully tested
     return NextResponse.json(
-      { error: 'Failed to fetch cryptocurrency data' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch cryptocurrency data' },
       { status: 500 }
     );
   }

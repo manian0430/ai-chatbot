@@ -185,7 +185,7 @@ const CryptoSearch = ({ onSearch }: { onSearch: (query: string) => void }) => {
 // Helper to fetch crypto data from our API
 const fetchCryptoData = async (symbol: string) => {
   try {
-    const response = await fetch(`${API_ROUTES.CRYPTO}?symbol=${encodeURIComponent(symbol)}`);
+    const response = await fetch(`${API_ROUTES.CRYPTO}?query=${encodeURIComponent(symbol)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch crypto data: ${response.status}`);
     }
