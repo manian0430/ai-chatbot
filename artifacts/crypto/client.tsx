@@ -10,10 +10,16 @@ import {
 } from '@/components/icons';
 import { toast } from 'sonner';
 import { useState, useMemo, useEffect } from 'react';
-import { ARTIFACT_KINDS } from '@/lib/artifacts/server';
 import { API_ROUTES } from '@/lib/db/client';
-import { DocumentProps } from '@/components/artifact';
-import { isJsonString } from '@/lib/utils';
+
+// Define the artifact kinds directly to avoid importing server modules
+const ARTIFACT_KINDS = {
+  TEXT: 'text',
+  CODE: 'code',
+  IMAGE: 'image',
+  SHEET: 'sheet',
+  CRYPTO: 'crypto',
+} as const;
 
 // Define the metadata structure for our crypto artifact
 interface Metadata {
@@ -57,7 +63,7 @@ declare global {
 }
 
 // Component to display crypto price chart
-const CryptoPriceChart = ({ historicalPrices }: { historicalPrices: Array<{ date: string; price: number }> }) => {
+const CryptoPriceChart = ({ historicalPrices }: { historicalPrices?: Array<{ date: string; price: number }> }) => {
   if (!historicalPrices || historicalPrices.length === 0) {
     return <div className="p-4 text-center text-gray-500">No historical data available</div>;
   }
@@ -88,7 +94,12 @@ const CryptoPriceChart = ({ historicalPrices }: { historicalPrices: Array<{ date
 };
 
 // Component to display crypto info
-const CryptoInfo = ({ metadata }: { metadata: Metadata }) => {
+const CryptoInfo = ({ metadata }: { metadata: Metadata | null }) => {
+  // If metadata is null, show an initial loading state
+  if (!metadata) {
+    return <div className="p-4 text-center text-gray-500">No cryptocurrency data available</div>;
+  }
+
   if (metadata.isLoading) {
     return <div className="p-4 text-center">Loading crypto data...</div>;
   }
@@ -216,9 +227,22 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
           const data = JSON.parse(streamPart.content as string);
           console.log('Parsed crypto data:', data);
           
+          // Ensure all required fields have default values
+          const safeData = {
+            tokenName: data.tokenName || 'Unknown',
+            tokenSymbol: data.tokenSymbol || 'N/A',
+            currentPrice: data.currentPrice || 0,
+            priceChange24h: data.priceChange24h || 0,
+            marketCap: data.marketCap || 0,
+            volume24h: data.volume24h || 0,
+            lastUpdated: data.lastUpdated || new Date().toISOString(),
+            description: data.description || '',
+            historicalPrices: Array.isArray(data.historicalPrices) ? data.historicalPrices : []
+          };
+          
           setMetadata((prevMetadata) => ({
             ...prevMetadata,
-            ...data,
+            ...safeData,
             isLoading: false
           }));
 
@@ -253,6 +277,21 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
   content: ({ metadata, setMetadata }) => {
     console.log('Rendering crypto content with metadata:', metadata);
     
+    // Initialize default metadata if it's null
+    const safeMetadata = metadata || {
+      tokenName: '',
+      tokenSymbol: '',
+      currentPrice: 0,
+      priceChange24h: 0,
+      marketCap: 0,
+      volume24h: 0,
+      lastUpdated: '',
+      historicalPrices: [],
+      description: '',
+      isLoading: false,
+      error: null
+    };
+    
     const handleSearch = async (query: string) => {
       console.log('Searching for crypto:', query);
       setMetadata((prevMetadata) => ({
@@ -270,9 +309,15 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
         const data = await response.json();
         console.log('Received crypto data:', data);
         
+        // Ensure that historicalPrices is always an array
+        const safeData = {
+          ...data,
+          historicalPrices: Array.isArray(data.historicalPrices) ? data.historicalPrices : []
+        };
+        
         setMetadata((prevMetadata) => ({
           ...prevMetadata,
-          ...data,
+          ...safeData,
           isLoading: false
         }));
       } catch (error) {
@@ -288,9 +333,9 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
     return (
       <div className="flex flex-col h-full">
         <CryptoSearch onSearch={handleSearch} />
-        <CryptoInfo metadata={metadata} />
-        {metadata.historicalPrices && metadata.historicalPrices.length > 0 && (
-          <CryptoPriceChart historicalPrices={metadata.historicalPrices} />
+        <CryptoInfo metadata={safeMetadata} />
+        {safeMetadata?.historicalPrices && safeMetadata.historicalPrices.length > 0 && (
+          <CryptoPriceChart historicalPrices={safeMetadata.historicalPrices} />
         )}
       </div>
     );
@@ -301,7 +346,10 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
       label: 'Refresh',
       description: 'Refresh crypto data',
       onClick: async ({ metadata, setMetadata }) => {
-        if (!metadata.tokenSymbol) {
+        // Use safe default values if metadata is null or missing properties
+        const safeMetadata = metadata || { tokenSymbol: '' };
+        
+        if (!safeMetadata.tokenSymbol) {
           toast.error('Please search for a cryptocurrency first');
           return;
         }
@@ -313,20 +361,37 @@ export const cryptoArtifact = new Artifact<'crypto', Metadata>({
         }));
 
         try {
-          const response = await fetch(`/api/crypto/search?query=${encodeURIComponent(metadata.tokenSymbol)}`);
+          // Use the symbol as the query
+          const response = await fetch(`/api/crypto/search?query=${encodeURIComponent(safeMetadata.tokenSymbol)}`);
           if (!response.ok) {
             throw new Error('Failed to refresh crypto data');
           }
           
           const data = await response.json();
+          
+          // Ensure all data has fallbacks for null values
+          const safeData = {
+            ...data,
+            tokenName: data.tokenName || 'Unknown',
+            tokenSymbol: data.tokenSymbol || safeMetadata.tokenSymbol,
+            currentPrice: data.currentPrice || 0,
+            priceChange24h: data.priceChange24h || 0,
+            marketCap: data.marketCap || 0,
+            volume24h: data.volume24h || 0,
+            lastUpdated: data.lastUpdated || new Date().toISOString(),
+            description: data.description || '',
+            historicalPrices: Array.isArray(data.historicalPrices) ? data.historicalPrices : []
+          };
+          
           setMetadata((prevMetadata) => ({
             ...prevMetadata,
-            ...data,
+            ...safeData,
             isLoading: false
           }));
           
           toast.success('Crypto data refreshed');
         } catch (error) {
+          console.error('Error refreshing crypto data:', error);
           setMetadata((prevMetadata) => ({
             ...prevMetadata,
             isLoading: false,
