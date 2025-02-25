@@ -1,3 +1,8 @@
+// Only import server-only in server contexts
+if (typeof window === 'undefined') {
+  require('server-only');
+}
+
 import type { InferSelectModel } from 'drizzle-orm';
 import {
   pgTable,
@@ -11,6 +16,10 @@ import {
   boolean,
 } from 'drizzle-orm/pg-core';
 
+// Re-export types for backward compatibility
+export * from './types';
+
+// Server-only database schema definitions
 export const user = pgTable('User', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
   email: varchar('email', { length: 64 }).notNull(),
@@ -72,7 +81,7 @@ export const document = pgTable(
     createdAt: timestamp('createdAt').notNull(),
     title: text('title').notNull(),
     content: text('content'),
-    kind: varchar('text', { enum: ['text', 'code', 'image', 'sheet'] })
+    kind: varchar('text', { enum: ['text', 'code', 'image', 'sheet', 'crypto'] })
       .notNull()
       .default('text'),
     userId: uuid('userId')

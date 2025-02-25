@@ -4,14 +4,16 @@ import type { Attachment, Message } from 'ai';
 import { useChat } from 'ai/react';
 import { useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-
-import { ChatHeader } from '@/components/chat-header';
-import type { Vote } from '@/lib/db/schema';
+import { useLocalStorage } from 'usehooks-ts';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Messages } from './messages';
+import { ChatInput } from './chat-input';
+import type { Vote } from '@/lib/db/client';
 import { fetcher, generateUUID } from '@/lib/utils';
 
+import { ChatHeader } from '@/components/chat-header';
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
-import { Messages } from './messages';
 import { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';

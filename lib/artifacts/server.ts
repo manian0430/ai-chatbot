@@ -4,9 +4,18 @@ import { sheetDocumentHandler } from '@/artifacts/sheet/server';
 import { textDocumentHandler } from '@/artifacts/text/server';
 import { ArtifactKind } from '@/components/artifact';
 import { DataStreamWriter } from 'ai';
-import { Document } from '../db/schema';
+import { Document } from '../db/client';
 import { saveDocument } from '../db/queries';
 import { Session } from 'next-auth';
+
+// Define artifact kinds directly here to avoid circular dependencies
+export const ARTIFACT_KINDS = {
+  TEXT: 'text',
+  CODE: 'code',
+  IMAGE: 'image',
+  SHEET: 'sheet',
+  CRYPTO: 'crypto'
+} as const;
 
 export interface SaveDocumentProps {
   id: string;
@@ -94,6 +103,22 @@ export const documentHandlersByArtifactKind: Array<DocumentHandler> = [
   codeDocumentHandler,
   imageDocumentHandler,
   sheetDocumentHandler,
+  // cryptoDocumentHandler will be registered separately to avoid circular dependencies
 ];
 
-export const artifactKinds = ['text', 'code', 'image', 'sheet'] as const;
+// Create a registration function to avoid circular dependencies
+export function registerDocumentHandler<T extends ArtifactKind>(handler: DocumentHandler<T>) {
+  // Only add the handler if it's not already in the array
+  if (!documentHandlersByArtifactKind.some(h => h.kind === handler.kind)) {
+    documentHandlersByArtifactKind.push(handler);
+  }
+}
+
+// The list of all possible artifact kinds
+export const artifactKinds = [
+  ARTIFACT_KINDS.TEXT, 
+  ARTIFACT_KINDS.CODE, 
+  ARTIFACT_KINDS.IMAGE, 
+  ARTIFACT_KINDS.SHEET, 
+  ARTIFACT_KINDS.CRYPTO
+] as const;

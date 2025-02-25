@@ -16,7 +16,7 @@ import {
 } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useDebounceCallback, useWindowSize } from 'usehooks-ts';
-import type { Document, Vote } from '@/lib/db/schema';
+import type { Document, Vote } from '@/lib/db/client';
 import { fetcher } from '@/lib/utils';
 import { MultimodalInput } from './multimodal-input';
 import { Toolbar } from './toolbar';
@@ -30,6 +30,7 @@ import { imageArtifact } from '@/artifacts/image/client';
 import { codeArtifact } from '@/artifacts/code/client';
 import { sheetArtifact } from '@/artifacts/sheet/client';
 import { textArtifact } from '@/artifacts/text/client';
+import { cryptoArtifact } from '@/artifacts/crypto/client';
 import equal from 'fast-deep-equal';
 
 export const artifactDefinitions = [
@@ -37,6 +38,7 @@ export const artifactDefinitions = [
   codeArtifact,
   imageArtifact,
   sheetArtifact,
+  cryptoArtifact,
 ];
 export type ArtifactKind = (typeof artifactDefinitions)[number]['kind'];
 

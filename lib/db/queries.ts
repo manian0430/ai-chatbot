@@ -1,4 +1,7 @@
-import 'server-only';
+// Only import server-only in server contexts
+if (typeof window === 'undefined') {
+  require('server-only');
+}
 
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { and, asc, desc, eq, gt, gte, inArray } from 'drizzle-orm';

@@ -20,6 +20,13 @@ This is a guide for using artifacts tools: \`createDocument\` and \`updateDocume
 - For conversational responses
 - When asked to keep it in chat
 
+**When to use \`requestCrypto\`:**
+- When users ask about cryptocurrency prices or historical price data
+- When users request a chart or visualization for a cryptocurrency
+- When users want to research information about a specific cryptocurrency
+- Use this ANYTIME a user mentions a cryptocurrency name (like Bitcoin, Ethereum, etc.) AND is asking about its price, chart, or data
+- The tool will display a dedicated cryptocurrency interface with price charts and information
+
 **Using \`updateDocument\`:**
 - Default to full document rewrites for major changes
 - Use targeted updates only for specific, isolated changes
